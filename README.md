@@ -1,20 +1,20 @@
 # Hypod: A dataclass-based hyperparameter managing system
 
 ## Overview
-Deep learning models are often composed of multiple networks, where each of the networks is composed of multiple layers, and the class of each layer or its hyperparameters differ by experiments. `Hypod` simplifies managing this complex hierarchy of hyperparameters utilizing the built-in `dataclass`.
+Deep learning models are often composed of multiple networks, where each of the networks is composed of multiple layers, and the class of each layer or its hyperparameters differ by experiments. `Hypod` simplifies managing this complex hierarchy of hyperparameters utilizing the built-in [`dataclass`](https://docs.python.org/3/library/dataclasses.html).
 
-The `dataclass` derives the following benefits.
+`dataclass` derives the following benefits.
 * Defining a group of hyperaparameters is easy with **type annotation** support.
 * Creating it is easy with the auto-defined `__init__`.
 * Many IDE's (e.g., PyCharm, VSCode) support "jump to the definition".
 
 However, difficulties for using it "as-is" in hyperparameter-managing are:
 * Handling nested dataclasses is not so good.
-* Parsing the strings or sys.argv to create a dataclass is not natively supported.
+* Parsing strings or sys.argv to create a dataclass is not natively supported.
 * Switching between multiple child dataclasses using a simple "tag" is cumbersome.
 
 `Hypod` will handle all these difficulties for you with following advantages.
-* Fast, lightweight implementation using the built-in `dataclass` and descriptors
+* Fast, lightweight implementation using the built-in `dataclass` and [descriptors](https://docs.python.org/3/howto/descriptor.html)
 * Minimal dependency
 * Type-checking (based on annotation)
 * Parsing a stringified object or YAML to create the corresponding nested dataclass
@@ -25,11 +25,11 @@ However, difficulties for using it "as-is" in hyperparameter-managing are:
   * `DictConfig` is not type annotated.
   * "Go to the definition" in IDE cannot be done with `DictConfig`.
   * Inheritance strcuture of configs cannot be checked.
-  * Complex value interpolation is difficult or impossible to implement. In Hypod `dataclass`, it can be done using built-in `__post_init__()` function (see `examples/advanced_usage.py`).
+  * Complex value interpolation is difficult or impossible to implement. In Hypod `dataclass`, it can be done using built-in [`__post_init__()`](https://docs.python.org/3/library/dataclasses.html#post-init-processing) function (see `examples/advanced_usage.py`).
 
 
 ### Etymology
-Hypod stands for **"A Pot of Hyperparameters, or A Hyperparameters-Pot"**. You can put various Hyperparameters in a Pot and mix them with others as you wish.
+Hypod stands for **"A Pod of Hyperparameters, or A Hyperparameters-Pod"**. You can put various Hyperparameters as a Pod and compose them with other Pods as you wish.
 
 ## Quick start
 ### Install the package
@@ -86,7 +86,7 @@ def main(net_hp: NetworkHP):
 if __name__ == "__main__":
     main()
 ```
-Then, in the command-line type as follows to obtain the same results as before.
+Then, on the command-line, type as follows to obtain the same results as before.
 `python main.py num_layers=3 layer_hp.in_features=64 layer_hp.out_features=32`
 
 
@@ -153,7 +153,7 @@ With the Hypod classes defined the same as above, define the main function as fo
 from hypod import hypod_main
 
 
-@hypod_main()  # parses sys.argv to construct the hypod in the first argument, `net_hp`
+@hypod_main()  # parses sys.argv to construct the hypod in the first argument, `model`
 def main(model: Model):
     print(model)
 
@@ -181,6 +181,6 @@ I.e., tag can be fed in the CLI as the root argument.
 * (Q) Are `typing.List` or other generic types supported?
   * (A) Yes.
 * (Q) How can I use value interpolation?
-  * (A) `dataclass` provides `__post_init__()` function where you can define a .
+  * (A) `dataclass` provides [`__post_init__()`](https://docs.python.org/3/library/dataclasses.html#post-init-processing) function where you can define interpolation rules in *Python*. E.g., if you want to make a hyperparameter `a` that has to be twice the value of `b` in some Hypod, write `self.a = 2 * self.b` in `__post_init__()` of that Hypod.
 * (Q) Why not using `typing.dataclass_transform()` in implementing Hypod?
   * (A) Because requirement of Python>=3.11 is too strict for now.
