@@ -45,28 +45,28 @@ from hypod import hypod
 @dataclass
 @hypod
 class LayerHP:
-  in_features: int
-  out_features: int
-  init_scale: float = 0.9
+    in_features: int
+    out_features: int
+    init_scale: float = 0.9
 
 
 @dataclass
 @hypod
 class NetworkHP:
-  num_layers: int
-  layer_hp: LayerHP
+    num_layers: int
+    layer_hp: LayerHP
 
 
 if __name__ == "__main__":
-  # Hypod can be created in the same manner as dataclass.
-  net_hp1 = NetworkHP(num_layers=3, layer_hp=LayerHP(64, 32))
-  print(net_hp1)
-  # Hypod can be also created from parsing stringified objects.
-  net_hp2 = NetworkHP(num_layers="3", layer_hp=LayerHP("64", 32))
-  print(net_hp2)
-  # Hypod class itself can be also created from a dictionary.
-  net_hp3 = NetworkHP(num_layers=3, layer_hp=dict(in_features=64, out_features=32))
-  print(net_hp3)
+    # Hypod can be created in the same manner as dataclass.
+    net_hp1 = NetworkHP(num_layers=3, layer_hp=LayerHP(64, 32))
+    print(net_hp1)
+    # Hypod can be also created from parsing stringified objects.
+    net_hp2 = NetworkHP(num_layers="3", layer_hp=LayerHP("64", 32))
+    print(net_hp2)
+    # Hypod class itself can be also created from a dictionary.
+    net_hp3 = NetworkHP(num_layers=3, layer_hp=dict(in_features=64, out_features=32))
+    print(net_hp3)
 
 ```
 
@@ -80,11 +80,11 @@ from hypod import hypod_main
 
 @hypod_main()  # parses sys.argv to construct the hypod in the first argument, `net_hp`
 def main(net_hp: NetworkHP):
-  print(net_hp)
+    print(net_hp)
 
 
 if __name__ == "__main__":
-  main()
+    main()
 ```
 Then, in the command-line type as follows to obtain the same results as before.
 `python main.py num_layers=3 layer_hp.in_features=64 layer_hp.out_features=32`
@@ -102,47 +102,47 @@ from hypod import hypod
 @dataclass
 @hypod
 class Data:
-  path: str
-  batch_size: int = 4
+    path: str
+    batch_size: int = 4
 
 
 @dataclass
 @hypod
 class FFHQData(Data, tag="ffhq"):
-  path: str = "/path/to/FFHQ"
-  meta: str = "Flicker-Faces HQ Data, containing 70k images"
+    path: str = "/path/to/FFHQ"
+    meta: str = "Flicker-Faces HQ Data, containing 70k images"
 
 
 @dataclass
 @hypod
 class FFHQDataLargeBatch(FFHQData, tag="ffhq_lg"):
-  batch_size: int = 16
+    batch_size: int = 16
 
 
 @dataclass
 @hypod
 class Model:
-  data: Data
-  net: NetworkHP
+    data: Data
+    net: NetworkHP
 
 
 if __name__ == "__main__":
-  model_with_ffhq = Model(
-    data="ffhq", net=NetworkHP(num_layers=3, layer_hp=LayerHP(64, 32)),
-  )
-  print(model_with_ffhq)
+    model_with_ffhq = Model(
+        data="ffhq", net=NetworkHP(num_layers=3, layer_hp=LayerHP(64, 32)),
+    )
+    print(model_with_ffhq)
 
-  model_with_ffhq_lg = Model(
-    data=dict(_tag="ffhq_lg"),  # Also can be created from dict with "_tag" key.
-    net=NetworkHP(num_layers=3, layer_hp=LayerHP(64, 32)),
-  )
-  print(model_with_ffhq_lg)
+    model_with_ffhq_lg = Model(
+        data=dict(_tag="ffhq_lg"),  # Also can be created from dict with "_tag" key.
+        net=NetworkHP(num_layers=3, layer_hp=LayerHP(64, 32)),
+    )
+    print(model_with_ffhq_lg)
 
-  model_with_cifar10 = Model(
-    data=dict(path="/path/to/cifar10"),
-    net=NetworkHP(num_layers=3, layer_hp=LayerHP(64, 32)),
-  )
-  print(model_with_cifar10)
+    model_with_cifar10 = Model(
+        data=dict(path="/path/to/cifar10"),
+        net=NetworkHP(num_layers=3, layer_hp=LayerHP(64, 32)),
+    )
+    print(model_with_cifar10)
 ```
 
 ### Command-line Usage with Inheritance
@@ -155,11 +155,11 @@ from hypod import hypod_main
 
 @hypod_main()  # parses sys.argv to construct the hypod in the first argument, `net_hp`
 def main(model: Model):
-  print(model)
+    print(model)
 
 
 if __name__ == "__main__":
-  main()
+    main()
 ```
 Then, in the command-line type as follows to obtain the same results as before.
 `python main.py model.data=ffhq model.net.num_layers=3 model.net.layer_hp.in_features=64 model.net.layer_hp.out_features=32`
