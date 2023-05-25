@@ -59,11 +59,9 @@ class TypeCheckedDescriptor:
                     _keys.update(_new_keys)
             # Warn if datacls is Union[dict, Hypod]
             if dict in get_args(datacls):
-                warnings.warn(
+                raise ValueError(
                     "Hypod class can be constructed from dict, "
-                    "and thus making a Union with dict is not a good idea. "
-                    "Here, if a dict value is given without '_tag' key,"
-                    "it will be considered as plain 'dict'."
+                    "and thus making a Union with dict is prohibited. "
                 )
         self._datacls = datacls
         self._objcls = objcls
@@ -75,15 +73,17 @@ class TypeCheckedDescriptor:
     @property
     def default(self):
         if isinstance(self._default, Field):
+            if (self._default.default is MISSING) == (
+                self._default.default_factory is MISSING
+            ):
+                raise ValueError(
+                    "Only one of 'default' or 'default_factory' should be defined."
+                )
+
             if self._default.default is not MISSING:
                 default_val = self._default.default
             if self._default.default_factory is not MISSING:
-                assert (
-                    self._default.default is MISSING
-                ), "Only one of 'default' or 'default_factory' should be defined."
                 default_val = self._default.default_factory()
-            else:
-                default_val = MISSING
         else:
             default_val = self._default
         return default_val
@@ -124,12 +124,21 @@ class TypeCheckedDescriptor:
                 if "_tag" in val:  # class hint is given by _tag
                     cls = self._datacls._subclasses[val["_tag"]]
                     val.pop("_tag")
-                else:  # no class hint; use the annotated class
-                    cls = self._datacls
-                if self.update_if_hypod and self.default is not MISSING:
+                else:  # no class hint
+                    if self.default is not MISSING:  # use the class of default
+                        cls = type(self.default)
+                    else:
+                        cls = self._datacls
+
+                if (
+                    self.update_if_hypod
+                    and self.default is not MISSING
+                    and cls is type(self.default)
+                ):
                     val = replace(self.default, **val)
                 else:
                     val = cls(**val)
+
             elif is_union_of_hypod(self._datacls):
                 if "_tag" in val:
                     # merge _subclasses dicts
@@ -141,15 +150,22 @@ class TypeCheckedDescriptor:
                     }
                     cls = _all_subclasses[val["_tag"]]
                     val.pop("_tag")
-                elif dict in get_args(self._datacls):
-                    cls = dict
-                else:
-                    raise ValueError(
-                        "A dict is given to construct a Hypod without a _tag key. "
-                        "Since the attribute type annotation is Union, "
-                        "its class cannot be determined."
-                    )
-                if self.update_if_hypod and self.default is not MISSING:
+                else:  # no class hint
+                    if self.default is not MISSING:  # use the class of default
+                        cls = type(self.default)
+                    else:
+                        raise ValueError(
+                            f"A dict is given to construct Hypod field '{self.name}' "
+                            "without a _tag key, while no default value has been set. "
+                            "Since the attribute type annotation is Union "
+                            f"'{self._datacls}', "
+                            "its class cannot be determined."
+                        )
+                if (
+                    self.update_if_hypod
+                    and self.default is not MISSING
+                    and cls is type(self.default)
+                ):
                     val = replace(self.default, **val)
                 else:
                     val = cls(**val)
