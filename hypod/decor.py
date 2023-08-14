@@ -1,8 +1,8 @@
 import importlib
 import warnings
-from dataclasses import MISSING, Field, is_dataclass, replace
+from dataclasses import MISSING, fields, is_dataclass
 from pathlib import Path
-from typing import List, Type, TypeVar, Union, get_args, get_origin, get_type_hints
+from typing import List, TypeVar, Union, get_args, get_origin, get_type_hints
 
 import yaml
 from typeguard import TypeCheckError, check_type
@@ -13,7 +13,7 @@ __all__ = ["MISSING", "hypod", "is_hypod", "is_union_of_hypod"]
 
 
 def is_hypod(datacls):
-    return hasattr(datacls, "_HYPOT") and is_dataclass(datacls)
+    return hasattr(datacls, "_HYPOD") and is_dataclass(datacls)
 
 
 def is_union_of_hypod(datacls):
@@ -27,6 +27,86 @@ def is_union_of(basetype, datacls):
     origin = get_origin(datacls)
     args = get_args(datacls)
     return origin is Union and basetype in args
+
+
+def infer_new_hypod_cls(field_name, annotated_cls, curr_val, new_val_dict: dict):
+    if is_hypod(annotated_cls):
+        if "_tag" in new_val_dict:  # class hint is given by _tag
+            cls = annotated_cls._subclasses[new_val_dict.pop("_tag")]
+        elif curr_val is not MISSING:  # use the class of default
+            cls = type(curr_val)
+        else:
+            cls = annotated_cls
+
+    elif is_union_of_hypod(annotated_cls):
+        if "_tag" in new_val_dict:
+            # merge _subclasses dicts
+            _all_subclasses = {
+                k: v
+                for _datacls in get_args(annotated_cls)
+                if is_hypod(_datacls)
+                for k, v in _datacls._subclasses.items()
+            }
+            cls = _all_subclasses[new_val_dict.pop("_tag")]
+        elif curr_val is not MISSING:  # use the class of default
+            cls = type(curr_val)
+        else:
+            raise ValueError(
+                f"A dict is given to construct Hypod field '{field_name}' "
+                "without a _tag key, while no default value has been set. "
+                "Since the attribute type annotation is Union "
+                f"'{annotated_cls}', "
+                "its class cannot be determined."
+            )
+
+    else:
+        raise ValueError(f"{field_name} is not a Hypod field")
+
+    return cls
+
+
+def infer_new_hypod_val(
+    field_name, annotated_cls, curr_val, new_val: Union[dict, str], update_if_hypod=True
+):
+    if isinstance(new_val, str):
+        new_val = dict(_tag=new_val)
+    new_cls = infer_new_hypod_cls(field_name, annotated_cls, curr_val, new_val)
+    if update_if_hypod and curr_val is not MISSING and new_cls is type(curr_val):
+        new_val = replace(curr_val, update_if_hypod=update_if_hypod, **new_val)
+    else:
+        new_val = new_cls(**new_val)
+    return new_val
+
+
+def replace(obj, /, update_if_hypod=True, **changes):
+    if not is_hypod(obj):
+        raise TypeError("hypod's replace() should be called on hypod instances")
+
+    for f in fields(obj):
+        if not f.init:
+            # Error if this field is specified in changes.
+            if f.name in changes:
+                raise ValueError(
+                    f"field {f.name} is declared with "
+                    "init=False, it cannot be specified with "
+                    "hypod_replace()"
+                )
+            continue
+
+        if f.name in changes:
+            new_val = changes[f.name]
+            if (is_hypod(f.type) or is_union_of_hypod(f.type)) and isinstance(
+                new_val, (dict, str)
+            ):  # implements unique updating behavior of hypod
+                curr_val = getattr(obj, f.name)
+                new_val = infer_new_hypod_val(
+                    f.name, f.type, curr_val, new_val, update_if_hypod=update_if_hypod
+                )
+                changes[f.name] = new_val
+        else:
+            changes[f.name] = getattr(obj, f.name)
+
+    return obj.__class__(**changes)
 
 
 class TypeCheckedDescriptor:
@@ -70,24 +150,6 @@ class TypeCheckedDescriptor:
     def name(self):
         return self._name[1:]
 
-    @property
-    def default(self):
-        if isinstance(self._default, Field):
-            if (self._default.default is MISSING) == (
-                self._default.default_factory is MISSING
-            ):
-                raise ValueError(
-                    "Only one of 'default' or 'default_factory' should be defined."
-                )
-
-            if self._default.default is not MISSING:
-                default_val = self._default.default
-            if self._default.default_factory is not MISSING:
-                default_val = self._default.default_factory()
-        else:
-            default_val = self._default
-        return default_val
-
     def _check_if_MISSING(self, val):
         if val is MISSING:
             raise ValueError(
@@ -105,74 +167,28 @@ class TypeCheckedDescriptor:
                 f"not compatible with the annotated type '{self._datacls}'."
             )
 
-    def __set__(self, obj, val):
-        self._check_if_MISSING(val)
+    def __set__(self, obj, new_val):
+        self._check_if_MISSING(new_val)
         # Parse stringified objects
-        if isinstance(val, str):
-            datacls_is_str_like = self._datacls is str or is_union_of(
-                str, self._datacls
+        if (
+            isinstance(new_val, str)
+            and self.allow_parsing
+            and not (self._datacls is str or is_union_of(str, self._datacls))
+            and not (is_hypod(self._datacls) or is_union_of_hypod(self._datacls))
+        ):
+            new_val = eval(new_val)  # val expected to be repr of the actual value
+
+        if (is_hypod(self._datacls) or is_union_of_hypod(self._datacls)) and isinstance(
+            new_val, (dict, str)
+        ):  # implements unique updating behavior of hypod
+            curr_val = getattr(obj, self._name, self._default)
+            new_val = infer_new_hypod_val(
+                self.name, self._datacls, curr_val, new_val, self.update_if_hypod
             )
-            if self.allow_parsing and not datacls_is_str_like:
-                if is_hypod(self._datacls) or is_union_of_hypod(self._datacls):
-                    val = dict(_tag=val)
-                else:
-                    val = eval(val)  # val expected to be repr of the actual value
-
-        # Handle Hypod objects
-        if isinstance(val, dict):
-            if is_hypod(self._datacls):
-                if "_tag" in val:  # class hint is given by _tag
-                    cls = self._datacls._subclasses[val["_tag"]]
-                    val.pop("_tag")
-                else:  # no class hint
-                    if self.default is not MISSING:  # use the class of default
-                        cls = type(self.default)
-                    else:
-                        cls = self._datacls
-
-                if (
-                    self.update_if_hypod
-                    and self.default is not MISSING
-                    and cls is type(self.default)
-                ):
-                    val = replace(self.default, **val)
-                else:
-                    val = cls(**val)
-
-            elif is_union_of_hypod(self._datacls):
-                if "_tag" in val:
-                    # merge _subclasses dicts
-                    _all_subclasses = {
-                        k: v
-                        for _datacls in get_args(self._datacls)
-                        if is_hypod(_datacls)
-                        for k, v in _datacls._subclasses.items()
-                    }
-                    cls = _all_subclasses[val["_tag"]]
-                    val.pop("_tag")
-                else:  # no class hint
-                    if self.default is not MISSING:  # use the class of default
-                        cls = type(self.default)
-                    else:
-                        raise ValueError(
-                            f"A dict is given to construct Hypod field '{self.name}' "
-                            "without a _tag key, while no default value has been set. "
-                            "Since the attribute type annotation is Union "
-                            f"'{self._datacls}', "
-                            "its class cannot be determined."
-                        )
-                if (
-                    self.update_if_hypod
-                    and self.default is not MISSING
-                    and cls is type(self.default)
-                ):
-                    val = replace(self.default, **val)
-                else:
-                    val = cls(**val)
 
         # Check type and set value
-        self._check_type(val)
-        setattr(obj, self._name, val)
+        self._check_type(new_val)
+        setattr(obj, self._name, new_val)
 
     def __get__(self, obj, objtype):
         if obj is None:
@@ -204,7 +220,7 @@ T = TypeVar("T")
 
 # def hypod(cls: Type[T]) -> Type[T]:
 def hypod(cls) -> "cls":  # Pycharm works better with this annotation
-    cls._HYPOT = "Hi I am a hypod"
+    cls._HYPOD = "Hi I am a hypod"
     cls._subclasses = {}
 
     # Assign __init_subclass__ method to register child class
