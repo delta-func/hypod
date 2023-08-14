@@ -9,7 +9,7 @@ from typeguard import TypeCheckError, check_type
 
 from .parser import parse_argv
 
-__all__ = ["MISSING", "hypod", "is_hypod", "is_union_of_hypod"]
+__all__ = ["MISSING", "hypod", "is_hypod", "is_union_of_hypod", "replace"]
 
 
 def is_hypod(datacls):
