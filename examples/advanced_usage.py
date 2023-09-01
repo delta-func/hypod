@@ -1,11 +1,11 @@
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Callable, Optional, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from hypod import hypod, hypod_main
+from hypod import hypod, hypod_main, replace
 
 
 @dataclass
