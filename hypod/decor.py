@@ -111,12 +111,20 @@ def replace(obj, /, update_if_hypod=True, **changes):
 
 class TypeCheckedDescriptor:
     def __init__(
-        self, name, default, datacls, objcls, allow_parsing=True, update_if_hypod=True
+        self,
+        name,
+        default,
+        datacls,
+        objcls,
+        allow_parsing=True,
+        update_if_hypod=True,
+        strict_type_checking=False,
     ):
         self._name = "_" + name
         self._default = default
         self.allow_parsing = allow_parsing
         self.update_if_hypod = update_if_hypod
+        self.strict_type_checking = strict_type_checking
         if allow_parsing and is_union_of(str, datacls):
             warnings.warn(
                 f"The field '{name}' with type '{datacls}' accepts 'str' type, "
@@ -161,11 +169,15 @@ class TypeCheckedDescriptor:
         try:
             check_type(val, self._datacls)
         except TypeCheckError:
-            raise TypeCheckError(
+            msg = (
                 f"The value '{val}' with type '{type(val)}' given for "
                 f"the field '{self.name}' of '{self._objcls}' is "
                 f"not compatible with the annotated type '{self._datacls}'."
             )
+            if self.strict_type_checking:
+                raise TypeCheckError(msg)
+            else:
+                warnings.warn(msg)
 
     def __set__(self, obj, new_val):
         self._check_if_MISSING(new_val)
