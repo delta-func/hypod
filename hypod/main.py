@@ -18,7 +18,7 @@ def parse_opts_as_dict(opts: List[str]) -> dict:
         opt = opt[2:]
         if "=" not in opt or not (0 < opt.index("=") < (len(opt) - 1)):
             raise ValueError(f"System option '{opt}' should be of the form '--foo=bar'")
-        key, val = opt[2:].split("=")
+        key, val = opt.split("=")
         opt_dicts[key] = val
     return opt_dicts
 
@@ -75,10 +75,12 @@ def hypod_main(
                 parsed_dict = dict()
                 if default_yaml_path is not None:
                     with open(default_yaml_path) as f:
-                        parsed_dict = yaml.load(f, Loader=yaml.FullLoader)
+                        _parsed_dict = yaml.load(f, Loader=yaml.FullLoader)
+                        parsed_dict.update(_parsed_dict)
                 if given_yaml_path is not None:
                     with open(given_yaml_path) as f:
-                        parsed_dict = yaml.load(f, Loader=yaml.FullLoader)
+                        _parsed_dict = yaml.load(f, Loader=yaml.FullLoader)
+                        parsed_dict.update(_parsed_dict)
                 args_dict.update(parsed_dict)
 
             # Note The Priority (The former will be overwritten by the latter):
