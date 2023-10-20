@@ -110,7 +110,6 @@ def hypod_main(
             _load_yaml_and_update_dict(
                 given_yaml_path=sys_opts.get("yaml_post"), default_yaml_path=yaml_post
             )
-            pprint.pprint(args_dict)
 
             hypod_instance = var_type.from_dict(args_dict)
             hypod_logger.info(pprint.pformat(hypod_instance))
