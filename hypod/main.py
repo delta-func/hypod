@@ -23,6 +23,17 @@ def parse_opts_as_dict(opts: List[str]) -> dict:
     return opt_dicts
 
 
+def nested_dict_update(orig_nested_dict: dict, update_nested_dict: dict):
+    def _dict_update(_orig, _update):
+        for k, v in _update.items():
+            if k in _orig and isinstance(_orig[k], dict):
+                _dict_update(_orig[k], v)
+            else:
+                _orig.update({k: v})
+
+    _dict_update(orig_nested_dict, update_nested_dict)
+
+
 def hypod_main(
     yaml_pre: Union[str, Path, None] = None,
     yaml_post: Union[str, Path, None] = None,
@@ -72,16 +83,14 @@ def hypod_main(
             def _load_yaml_and_update_dict(
                 given_yaml_path=None, default_yaml_path=None
             ):
-                parsed_dict = dict()
                 if default_yaml_path is not None:
                     with open(default_yaml_path) as f:
-                        _parsed_dict = yaml.load(f, Loader=yaml.FullLoader)
-                        parsed_dict.update(_parsed_dict)
+                        parsed_dict = yaml.load(f, Loader=yaml.FullLoader)
+                        nested_dict_update(args_dict, parsed_dict)
                 if given_yaml_path is not None:
                     with open(given_yaml_path) as f:
-                        _parsed_dict = yaml.load(f, Loader=yaml.FullLoader)
-                        parsed_dict.update(_parsed_dict)
-                args_dict.update(parsed_dict)
+                        parsed_dict = yaml.load(f, Loader=yaml.FullLoader)
+                        nested_dict_update(args_dict, parsed_dict)
 
             # Note The Priority (The former will be overwritten by the latter):
             # * Hypod (dataclass) definition in python
@@ -96,11 +105,12 @@ def hypod_main(
                 given_yaml_path=sys_opts.get("yaml_pre"), default_yaml_path=yaml_pre
             )
             # Main Hypod
-            args_dict.update(parse_argv(sys_argv))
+            nested_dict_update(args_dict, parse_argv(sys_argv))
             # Yaml-post
             _load_yaml_and_update_dict(
                 given_yaml_path=sys_opts.get("yaml_post"), default_yaml_path=yaml_post
             )
+            pprint.pprint(args_dict)
 
             hypod_instance = var_type.from_dict(args_dict)
             hypod_logger.info(pprint.pformat(hypod_instance))
