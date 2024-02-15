@@ -3,7 +3,7 @@ import logging
 import pprint
 import sys
 from pathlib import Path
-from typing import List, Union, get_type_hints
+from typing import List, Optional, Union, get_type_hints
 
 import yaml
 
@@ -36,9 +36,13 @@ def nested_dict_update(orig_nested_dict: dict, update_nested_dict: dict):
 
 def hypod_main(
     yaml_pre: Union[str, Path, None] = None,
+    argv: Optional[List[str]] = None,
     yaml_post: Union[str, Path, None] = None,
     logger=None,
 ):
+    if argv is None:
+        argv = sys.argv[1:]
+
     def _main_decor(main_fn):
         @functools.wraps(main_fn)
         def _wrapped_main_fn():
@@ -72,7 +76,7 @@ def hypod_main(
 
             sys_argv = []  # e.g., foo.bar=baz
             sys_opts = []  # e.g., --foo=bar
-            for a in sys.argv[1:]:
+            for a in argv:
                 if a.startswith("--"):  # system options start with a double-dash.
                     sys_opts.append(a)
                 else:
